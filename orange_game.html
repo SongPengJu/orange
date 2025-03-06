@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>小桔子大冒险</title>
+    <style>
+        body {
+            margin: 0;
+            background: linear-gradient(180deg, #a8edea 0%, #fed6e3 100%);
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Microsoft Yahei', sans-serif;
+        }
+
+        #gameArea {
+            width: 500px;
+            height: 600px;
+            margin: 20px auto;
+            position: relative;
+        }
+
+        #lane {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        #orange {
+            width: 60px;
+            height: 60px;
+            background: #ffa500;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 60px;
+            left: 40%;
+            transition: left 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 3px solid #ff8c00;
+        }
+
+        .item {
+            width: 40px;
+            height: 40px;
+            position: absolute;
+            animation: slide 4s linear;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border-radius: 50%;
+        }
+
+        .heart { background: #ff69b4; color: white; }
+        .bomb { background: #4a4a4a; color: white; }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.8);
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        #level {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.8);
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px 40px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: none;
+        }
+
+        @keyframes slide {
+            from { top: -40px; }
+            to { top: 600px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div>❤️ × <span id="health">5</span></div>
+        <div>❤️收集: <span id="score">0</span>/10</div>
+    </div>
+    <div id="level">关卡: <span id="currentLevel">1</span>/5</div>
+    <div id="gameArea">
+        <div id="lane"></div>
+        <div id="orange"></div>
+    </div>
+    <div id="message">
+        <h2 id="messageText"></h2>
+    </div>
+
+    <script>
+        let currentLevel = 1;
+        let orangePos = 2;
+        let health = 5;
+        let score = 0;
+        const positions = ['10%', '30%', '50%', '70%', '90%'];
+        let itemInterval;
+
+        // 关卡配置（新增初始血量参数）
+        const levelConfig = {
+            1: { interval: 1800, bombChance: 0.3, speed: "4s", initHealth: 5 },
+            2: { interval: 1600, bombChance: 0.4, speed: "3.5s", initHealth: 4 },
+            3: { interval: 1400, bombChance: 0.5, speed: "3s", initHealth: 3 },
+            4: { interval: 1200, bombChance: 0.6, speed: "2.5s", initHealth: 2 },
+            5: { interval: 1000, bombChance: 0.7, speed: "2s", initHealth: 1 }
+        };
+
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            if(e.key === 'ArrowLeft' && orangePos > 0) orangePos--;
+            if(e.key === 'ArrowRight' && orangePos < 4) orangePos++;
+            document.getElementById('orange').style.left = positions[orangePos];
+        });
+
+        // 创建道具
+        function createItem() {
+            const config = levelConfig[currentLevel];
+            const item = document.createElement('div');
+            const isHeart = Math.random() > config.bombChance;
+            
+            item.className = `item ${isHeart ? 'heart' : 'bomb'}`;
+            item.innerHTML = isHeart ? '❤️' : '💣';
+            item.style.left = positions[Math.floor(Math.random() * 5)];
+            item.style.animationDuration = config.speed;
+
+            item.onanimationend = () => item.remove();
+            item.getBoundingClientRect();
+
+            // 碰撞检测
+            const checkCollision = () => {
+                const orangeRect = document.getElementById('orange').getBoundingClientRect();
+                const itemRect = item.getBoundingClientRect();
+                
+                if (!(orangeRect.right < itemRect.left || 
+                    orangeRect.left > itemRect.right ||
+                    orangeRect.bottom < itemRect.top ||
+                    orangeRect.top > itemRect.bottom)) {
+                    
+                    item.remove();
+                    if(isHeart) {
+                        score++;
+                        document.getElementById('score').textContent = score;
+                        if(score >= 10) showMessage('过关啦！');
+                    } else {
+                        health--;
+                        document.getElementById('health').textContent = health;
+                        if(health <= 0) showMessage('游戏结束');
+                    }
+                }
+            };
+
+            requestAnimationFrame(function check() {
+                if(document.body.contains(item)) {
+                    checkCollision();
+                    requestAnimationFrame(check);
+                }
+            });
+
+            document.getElementById('gameArea').appendChild(item);
+        }
+
+        // 显示信息
+        function showMessage(text) {
+            if(text === '过关啦！') {
+                if(currentLevel < 5) {
+                    currentLevel++;
+                    health = levelConfig[currentLevel].initHealth; // 根据新关卡设置血量
+                    document.getElementById('messageText').textContent = `第${currentLevel}关 初始血量：${health}`;
+                    
+                    setTimeout(() => {
+                        document.getElementById('message').style.display = 'none';
+                        document.getElementById('health').textContent = health;
+                        updateLevel();
+                        score = 0;
+                        document.getElementById('score').textContent = 0;
+                    }, 1500);
+                } else {
+                    document.getElementById('messageText').textContent = '恭喜通关全部关卡！';
+                    currentLevel = 1;
+                }
+            } else {
+                document.getElementById('messageText').textContent = text;
+            }
+            
+            document.getElementById('message').style.display = 'block';
+            clearInterval(itemInterval);
+        }
+
+
+        // 重新开始
+        function restart() {
+            currentLevel = 1;
+            health = levelConfig[currentLevel].initHealth; // 始终从第一关开始
+            score = 0;
+            orangePos = 2;
+            document.getElementById('orange').style.left = positions[2];
+            document.getElementById('health').textContent = health;
+            document.getElementById('score').textContent = 0;
+            document.getElementById('currentLevel').textContent = 1;
+            document.getElementById('message').style.display = 'none';
+            updateLevel();
+        }
+
+        // 更新关卡显示
+        function updateLevel() {
+            document.getElementById('currentLevel').textContent = currentLevel;
+            clearInterval(itemInterval);
+            itemInterval = setInterval(createItem, levelConfig[currentLevel].interval);
+        }
+
+        // 初始化游戏
+        updateLevel();
+    </script>
+</body>
+</html>
